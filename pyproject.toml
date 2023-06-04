@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "devdays-2023"
+version = "0.1.0"
+description = ""
+authors = ["Axel Vanraes <axel.vanraes@tiro.health>"]
+readme = "README.md"
+packages = [{include = "devdays_2023"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = "^1.10.8"
+fhir-py-types = {path = "../fhir-py-types", develop = true}
+requests = "^2.31.0"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.23.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
