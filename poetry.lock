@@ -450,14 +450,16 @@ description = ""
 optional = false
 python-versions = "^3.11"
 files = []
-develop = true
+develop = false
 
 [package.dependencies]
 pydantic = "^1.10.7"
 
 [package.source]
-type = "directory"
-url = "../fhir-py-types"
+type = "git"
+url = "https://github.com/axelv/fhir-py-types.git"
+reference = "feature/mvp-support-profiles"
+resolved_reference = "f70678bae139b9ad5fa56885786bb76e26f571c2"
 
 [[package]]
 name = "fhirpy"
@@ -1421,4 +1423,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "f6e0e055ef1aa6e1f6a865f54a955038b2595792992451dcf28b1d1ea361d5f5"
+content-hash = "cf1687cd48520cc713c0a7a0620a720f3d6a9ab3c03bbdfd5d7b1f66b2b61e3b"
