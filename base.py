@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, Sequence, Tuple, Optional, Any, Union, AbstractSet, Mapping
 import json
 from pydantic import BaseModel as PydanticBaseModel
-from pydantic.utils import sequence_like
 
 if TYPE_CHECKING:
     ReprArgs = Sequence[Tuple[Optional[str], Any]]
@@ -42,19 +41,9 @@ class BaseModel(PydanticBaseModel):
             (k, v)
             for k, v in super().__repr_args__() if (k not in self.__fields__ or self.__fields__[k].field_info.extra.get("summary", True)) and not _is_empty(v)
         ]
-
-    #@classmethod
-    #def _get_value(
-        #cls,
-        #v: Any,
-        #exclude_none: bool,
-        #**kwds: Any,
-    #) -> Any:
-        #try:
-            #if exclude_none and len(v) == 0:
-                #return None
-        #except TypeError:
-            #return super()._get_value(v=v, **kwds)
+    def _repr_html_(self):
+        if "text" in self.__fields__ and self.text is not None: # type: ignore
+            return self.text.div # type: ignore
 
     class Config:
         json_dumps = json_dumps

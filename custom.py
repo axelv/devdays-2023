@@ -17,7 +17,7 @@ class OperationOutcomeException(RuntimeError):
         return "\n".join(f"""[OperationOutcomeException] {issue.severity} -- {issue.code}: {issue.diagnostics}""" for issue in outcome.issue)
 
     def _repr_html_(self):
-        return self.message
+        return self.message_html
     
     def __str__(self):
         return self.message
