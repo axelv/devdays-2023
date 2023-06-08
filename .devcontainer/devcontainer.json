@@ -15,7 +15,7 @@
   "forwardPorts": [8000, 8501],
 
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "poetry install"
+  "postCreateCommand": "poetry export --without-hashes -f requirements.txt > requirements.txt"
 
   // Configure tool-specific properties.
   // "customizations": {},
