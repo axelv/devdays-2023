@@ -24,3 +24,6 @@ You have three options to setup the environment for this project.
     - Make sure you have Python 3.11 and Poetry installed
     - Export a `requirements.txt` from using `poetry export --without-hashes > requirements.txt`
     - `pip install -r requirements.txt` to install dependencies.
+
+---
+The slides I used during the presentation: https://docs.google.com/presentation/d/1jxldt1T3rxkFREqj8kmNAB4SDiUFTCkr/edit?usp=sharing&ouid=101576060927276604405&rtpof=true&sd=true
