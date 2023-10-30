@@ -104,8 +104,9 @@ cm = tx_client.closure(name=r4.string(cm_name), concept=[r4.Coding.parse_obj({"s
 
 st.session_state["cm_map"].extend([c.dict(exclude_none=True) for cm_group in cm.group for c in cm_group.element])
 ### Convert to polars DataFrame
-
-filtered_list = [item for item in st.session_state["cm_map"] if int(item['target'][0]['code']) == int(sct_coding.code)]
+print(st.session_state["cm_map"])
+filtered_unmatched = [item for item in st.session_state["cm_map"] if item['target'][0]['equivalence'] != "unmatched"]
+filtered_list = [item for item in filtered_unmatched if int(item['target'][0]['code']) == int(sct_coding.code)]
 df_cm = pl.DataFrame(filtered_list)
 if df_cm.shape[0] == 0:
     st.write("No matching concepts found")
