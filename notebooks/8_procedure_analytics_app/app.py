@@ -23,53 +23,55 @@ class SCTCoding(r4.Coding):
         return cls(system="http://snomed.info", code=code, display=display)
 
 @st.cache_data
-def load_data(bundles:list[Path])->tuple[tuple[r4.Condition], tuple[r4.Patient]]: 
+def load_data(bundles:list[Path])->tuple[tuple[r4.Procedure], tuple[r4.Patient]]: 
     """This function loads all the data from bundles on the disk and initializes the closure table."""
     if len(bundles) == 0:
         return tuple(), tuple()
     progress = st.progress(0.0, "Loading...")
-    conditions = []
+    procedures = []
     patients = []
-    ### Load all Condition and Patient resources for selected bundles
+    ### Load all procedure and Patient resources for selected bundles
     for i,bundle_path in enumerate(bundles):
-        progress.progress(i/len(bundles))
+        progress.progress(i/len(bundles), "Loading bundle "+str(i)+" of "+str(len(bundles)))
         bundle = r4.Bundle.parse_file(bundle_path)
         for entry in bundle.entry:
-            if entry.resource is not None and entry.resource.resourceType == "Condition":
-                conditions.append(entry.resource)
+            if entry.resource is not None and entry.resource.resourceType == "Procedure":
+                procedures.append(entry.resource)
             if entry.resource is not None and entry.resource.resourceType == "Patient":
                 patients.append(entry.resource)
     progress.progress(0.95, "Initializing closure table")
 
     progress.progress(1.0, "Loading complete")
-    return tuple(conditions), tuple(patients)
+    return tuple(procedures), tuple(patients)
 
 st.title("Analytics App")
 
 tx_client = SyncFHIRTerminologyClient("http://r4.ontoserver.csiro.au/fhir")
 
 ## Selected the patients
-patient_bundles = list(Path("fhir/").glob("*.json"))
+patient_bundles = sorted(list(Path("fhir/").glob("*.json")))
 form = st.sidebar.form("Select patients")
 default_bundles = []
 default = form.checkbox("Load default patients")
 if default:
-    default_bundles = patient_bundles[1:10]
-selected_bundles = form.multiselect("Select patients", patient_bundles, format_func=lambda x: x.stem)
+    default_bundles = patient_bundles[40:50]
+
+selected_bundles = form.multiselect("Select patients", patient_bundles, format_func=lambda x: x.stem, default=default_bundles)
+default_bundles = [bundle for bundle in patient_bundles if "patient" in bundle.stem]
 form.form_submit_button("Load")
 
 # This is id is passed to the server to identify the closure table. Make sure it is unique to you.
 cm_name = str(random.randint(0,10000))
 
-# Load data and pass the codes of the conditions to the closure api
-conditions, patients = load_data(selected_bundles)
-sct_codings = set(SCTCoding.parse_obj(coding) for c in conditions if c.code.coding[0].system == "http://snomed.info/sct" for coding in c.code.coding)
+# Load data and pass the codes of the procedures to the closure api
+procedures, patients = load_data(selected_bundles)
+sct_codings = set(SCTCoding.parse_obj(coding) for c in procedures if c.code.coding[0].system == "http://snomed.info/sct" for coding in c.code.coding)
 tx_client.closure(name=r4.string(cm_name))
 cm:r4.ConceptMap = tx_client.closure(name=r4.string(cm_name), concept= list(sct_codings))
 st.session_state["cm_map"].extend([c.dict(exclude_none=True) for cm_group in cm.group for c in cm_group.element])
 
 ### Convert to polars DataFrames
-df_conditions = pl.DataFrame([c.dict(exclude_none=True) for c in conditions])
+df_procedures = pl.DataFrame([c.dict(exclude_none=True) for c in procedures])
 df_patients = pl.DataFrame([p.dict(exclude_none=True) for p in patients])
 
 ### Show the DataFrames
@@ -78,8 +80,8 @@ if df_patients.shape[0] > 0:
         st.write(df_patients.select(name=pl.col("name").list.eval(pl.element().struct["family"]+" "+pl.element().struct["given"].list.join(" ")),
                                     identifier=pl.col("identifier").list.eval(pl.element().struct["system"]+"|"+pl.element().struct["value"])
                                     ).head())
-    with st.expander("Conditions overview"):
-        st.table(df_conditions.select(code=pl.col("code").struct["text"]).get_column("code").value_counts())
+    with st.expander("procedures overview"):
+        st.table(df_procedures.select(code=pl.col("code").struct["text"]).get_column("code").value_counts())
 else:
     st.write("No data loaded yet")
 
@@ -109,29 +111,40 @@ if df_cm.shape[0] == 0:
     st.write("No matching concepts found")
     st.stop()
 df_cm_flat=df_cm.select(pl.col("target").list.explode().struct["code"].alias("target_code"), pl.col("target").list.explode().struct["equivalence"], source_code=pl.col("code"))
-df_conditions_ext = df_conditions\
-                        .select(pl.all(), text=pl.col("code").struct["text"], subject_id=pl.col("subject").struct["reference"].str.replace("urn:uuid:", ""))\
+print(df_procedures.columns)
+df_procedures_ext = df_procedures\
+                        .select(pl.all(), text=pl.col("code").struct["text"],bodysite = pl.col("bodySite"), device= pl.col("focalDevice"),subject_id=pl.col("subject").struct["reference"].str.replace("urn:uuid:", ""))\
                         .join(df_patients, left_on="subject_id", right_on="id")
-
 ### Show the DataFrame
 with st.expander("Concept Map", expanded=False):
-    st.write(df_cm_flat)
-    st.write(df_conditions_ext.get_column("code").struct["coding"].list.explode().struct["code"])
+    st.dataframe(df_cm_flat)
+    #st.write(df_procedures_ext.get_column("code").struct["coding"].list.explode().struct["code"])
 
 
-joined_conditions = df_cm_flat\
-                .join(df_conditions_ext, left_on="source_code", right_on=pl.col("code").struct["coding"].list.explode().struct["code"])\
-                .groupby(by="subject_id")\
-                .first()
-if joined_conditions.shape[0] > 0:
-    st.dataframe(joined_conditions
+joined_procedures = df_cm_flat\
+                .join(df_procedures_ext, left_on="source_code", right_on=pl.col("code").struct["coding"].list.explode().struct["code"])
+
+
+
+if joined_procedures.shape[0] > 0:
+
+    st.header("Matching Procedures")
+    st.dataframe(joined_procedures
              .select(
-                "subject_id",
                 "text",
-                "birthDate",
+                "source_code",
                 name=pl.col("name").list.first().struct["family"]+" "+pl.col("name").list.first().struct["given"].list.join(" ")
             ).to_pandas())
+    
+    joined_procedures_groupby = joined_procedures.groupby(by="subject_id").first()
+    st.header("Matching Patients")
+    st.dataframe(joined_procedures_groupby
+             .select(
+                "source_code",
+                name=pl.col("name").list.first().struct["family"]+" "+pl.col("name").list.first().struct["given"].list.join(" ")
+            ).to_pandas())
+
 else:
-    st.write("No matching conditions found")
+    st.write("No matching procedures found")
 
 
